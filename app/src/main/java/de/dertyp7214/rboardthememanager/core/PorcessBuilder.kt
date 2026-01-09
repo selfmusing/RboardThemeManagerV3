@@ -1,13 +1,22 @@
 package de.dertyp7214.rboardthememanager.core
 
-import android.os.Build
 import com.dertyp7214.logs.helpers.Logger
 import java.io.File
+import java.io.OutputStreamWriter
 
 fun ProcessBuilder.su(vararg command: String): Process {
     Logger.log(Logger.Companion.Type.INFO, "[ProcessBuilder.su]", command.joinToString(", "))
-    
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) redirectError(File("/dev/null"))
-    command("su", "--mount-master", "-c", command.joinToString("; "))
-    return start()
+    redirectError(File("/dev/null"))
+
+    // Start su without -c to avoid ARG_MAX overflow
+    command("su", "--mount-master")
+    val proc = start()
+
+    // Write commands through stdin instead of argv
+    OutputStreamWriter(proc.outputStream).use { w ->
+        command.forEach { w.appendLine(it) }
+        w.appendLine("exit")
+    }
+
+    return proc
 }
